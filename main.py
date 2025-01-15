@@ -1,3 +1,7 @@
+#!/usr/bin/env python3
+
+import argparse
+import os
 import re
 import signal
 import subprocess
@@ -48,7 +52,7 @@ def _ping_host(host: str, count: int) -> Tuple[str, str]:
 def _pinger(
     hosts: List[str],
     ping_count: int,
-    scrape_interval: int,
+    poll_interval: int,
     results_queue: Queue,
     run_flag: Event,
     process_num: int,
@@ -72,10 +76,10 @@ def _pinger(
                 )
         duration = time.time() - start_time
         results_queue.put(ProcessDuration(process_num, duration))
-        next_sleep = scrape_interval - duration
+        next_sleep = poll_interval - duration
         if next_sleep < 0:
             print(
-                "Next sleep is less than 1 second. Consider tuning the scrape_interval to a higher value."
+                "Next sleep is less than 1 second. Consider tuning the poll_interval to a higher value."
             )
         time.sleep(max(next_sleep, 1))
 
@@ -116,12 +120,64 @@ def _process_result(result: Union[PingResult, ProcessDuration]):
         print("Result is not a PingResult or ProcessDuration instance.")
 
 
-def main(http_port: int, hosts: List[str], max_processes: int) -> None:
+def _parse_args():
+    parser = argparse.ArgumentParser(description="Ping Exporter Configuration")
+
+    parser.add_argument(
+        "--http_address",
+        type=str,
+        default=os.getenv("HTTP_ADDRESS", "0.0.0.0"),
+        help="HTTP bind address for the server (default: 0.0.0.0 or env HTTP_ADDRESS)",
+    )
+    parser.add_argument(
+        "--http_port",
+        type=int,
+        default=int(os.getenv("HTTP_PORT", 8080)),
+        help="HTTP port for the server (default: 8080 or env HTTP_PORT)",
+    )
+    parser.add_argument(
+        "--hosts",
+        type=lambda s: s.split(","),
+        default=os.getenv("HOSTS", "").split(","),
+        help="Comma-separated list of hosts (default: localhost or env HOSTS)",
+    )
+    parser.add_argument(
+        "--max_processes",
+        type=int,
+        default=int(os.getenv("MAX_PROCESSES", 4)),
+        help="Maximum number of processes (default: 4 or env MAX_PROCESSES). Set to -1 for no limit.",
+    )
+    parser.add_argument(
+        "--poll_interval",
+        type=int,
+        default=int(os.getenv("POLL_INTERVAL", 60)),
+        help="Poll interval in seconds (default: 60 or env POLL_INTERVAL)",
+    )
+    parser.add_argument(
+        "--ping_count",
+        type=int,
+        default=int(os.getenv("PING_COUNT", 3)),
+        help="Number of ping attempts per host (default: 3 or env PING_COUNT)",
+    )
+
+    return parser.parse_args()
+
+
+def main(
+    http_address: str,
+    http_port: int,
+    hosts: List[str],
+    max_processes: int,
+    poll_interval: int,
+    ping_count: int,
+) -> None:
     # Dedupe hosts, in case of duplicate entries
-    deduped_hosts = list(set(hosts))
-    if len(deduped_hosts) != len(hosts):
-        print("Deduped hosts: {}".format(deduped_hosts))
-        hosts = deduped_hosts
+    hosts = [host for host in set([host.strip() for host in hosts]) if host]
+
+    # Do nothing if there are no hosts
+    if not hosts:
+        print("No hosts provided, exiting.")
+        return
 
     # Set up termination handler
     run_flag = Event()
@@ -136,7 +192,7 @@ def main(http_port: int, hosts: List[str], max_processes: int) -> None:
     )
 
     # Start the Prometheus Server
-    start_http_server(http_port)
+    start_http_server(http_port, http_address)
 
     # Calculate the number of processes we can use, and chunk the input hosts list accordingly
     if max_processes == -1:
@@ -150,7 +206,14 @@ def main(http_port: int, hosts: List[str], max_processes: int) -> None:
         print(f"Starting process {index} with {len(hosts_chunk)} hosts")
         process = Process(
             target=_pinger,
-            args=(hosts_chunk, 4, 15, results_queue, run_flag, index),
+            args=(
+                hosts_chunk,
+                ping_count,
+                poll_interval,
+                results_queue,
+                run_flag,
+                index,
+            ),
             daemon=True,
         )
         processes.append(process)
@@ -165,4 +228,19 @@ def main(http_port: int, hosts: List[str], max_processes: int) -> None:
 
 
 if __name__ == "__main__":
-    main(8080, [], 1)
+    args = _parse_args()
+    print("Configuration:")
+    print(f"\tHTTP Address: {args.http_address}")
+    print(f"\tHTTP Port: {args.http_port}")
+    print(f"\tHosts: {args.hosts}")
+    print(f"\tMax Processes: {args.max_processes}")
+    print(f"\tPoll Interval: {args.poll_interval}")
+    print(f"\tPing Count: {args.ping_count}")
+    main(
+        args.http_address,
+        args.http_port,
+        args.hosts,
+        args.max_processes,
+        args.poll_interval,
+        args.ping_count,
+    )
