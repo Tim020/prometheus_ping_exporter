@@ -102,6 +102,7 @@ def _process_result(result: Union[PingResult, ProcessDuration]):
                 break
         if not summary_match:
             print("Could not find packet transmit summary in ping output, ignoring.")
+            return
 
         packets_transmitted = int(summary_match.group("transmit_packets"))
         TRANSMITTED_PACKETS.labels(host=result.host).inc(packets_transmitted)
@@ -150,8 +151,8 @@ def _parse_args():
     parser.add_argument(
         "--poll_interval",
         type=int,
-        default=int(os.getenv("POLL_INTERVAL", 60)),
-        help="Poll interval in seconds (default: 60 or env POLL_INTERVAL)",
+        default=int(os.getenv("POLL_INTERVAL", 120)),
+        help="Poll interval in seconds (default: 120 or env POLL_INTERVAL)",
     )
     parser.add_argument(
         "--ping_count",
