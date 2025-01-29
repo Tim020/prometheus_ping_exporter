@@ -1,4 +1,4 @@
-FROM python:3.10-bookworm
+FROM --platform=linux/amd64 python:3.10-bookworm AS build
 RUN apt update
 RUN apt install iputils-ping -y
 
