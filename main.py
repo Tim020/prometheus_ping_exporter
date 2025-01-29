@@ -25,7 +25,7 @@ from prometheus_ping_exporter.metrics import (
 from prometheus_ping_exporter.types import PingResult, ProcessDuration
 
 ping_summary = re.compile(
-    r"(?P<transmit_packets>[0-9]+) packets transmitted, (?P<received_packets>[0-9+]) packets received, (?P<packet_loss>[0-9]+\.[0-9]+)% packet loss.*"
+    r"(?P<transmit_packets>[0-9]+).* transmitted, (?P<received_packets>[0-9+]).* received, (?P<packet_loss>[0-9]+(\.[0-9]+)?)% packet loss.*"
 )
 
 
