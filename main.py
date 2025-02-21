@@ -29,6 +29,11 @@ ping_summary = re.compile(
     r"(?P<transmit_packets>[0-9]+).* transmitted, (?P<received_packets>[0-9+]).* received, (?P<packet_loss>[0-9]+(\.[0-9]+)?)% packet loss.*"
 )
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)-8s %(message)s",
+    datefmt="%Y-%m-%dT%H:%M:%S",
+)
 logger = logging.getLogger(__name__)
 
 
