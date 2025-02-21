@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import logging
 
 import argparse
 import os
@@ -28,9 +29,11 @@ ping_summary = re.compile(
     r"(?P<transmit_packets>[0-9]+).* transmitted, (?P<received_packets>[0-9+]).* received, (?P<packet_loss>[0-9]+(\.[0-9]+)?)% packet loss.*"
 )
 
+logger = logging.getLogger(__name__)
+
 
 def terminate_processes(signum, frame, processes: List[Process], run_flag: Event):
-    print("Signal received, terminating processes.")
+    logger.info("Signal received, terminating processes.")
     run_flag.set()
     for p in processes:
         p.terminate()
@@ -57,6 +60,7 @@ def _pinger(
     run_flag: Event,
     process_num: int,
 ) -> None:
+    internal_logger = logging.getLogger(f"{__name__}.process[{process_num}]")
     while not run_flag.is_set():
         start_time = time.time()
         for host in hosts:
@@ -78,7 +82,7 @@ def _pinger(
         results_queue.put(ProcessDuration(process_num, duration))
         next_sleep = poll_interval - duration
         if next_sleep < 0:
-            print(
+            internal_logger.info(
                 "Next sleep is less than 1 second. Consider tuning the poll_interval to a higher value."
             )
         time.sleep(max(next_sleep, 1))
@@ -101,7 +105,7 @@ def _process_result(result: Union[PingResult, ProcessDuration]):
             if summary_match:
                 break
         if not summary_match:
-            print("Could not find packet transmit summary in ping output, ignoring.")
+            logger.warning("Could not find packet transmit summary in ping output, ignoring.")
             return
 
         packets_transmitted = int(summary_match.group("transmit_packets"))
@@ -118,7 +122,7 @@ def _process_result(result: Union[PingResult, ProcessDuration]):
             result.duration
         )
     else:
-        print("Result is not a PingResult or ProcessDuration instance.")
+        logger.warning("Result is not a PingResult or ProcessDuration instance.")
 
 
 def _parse_args():
@@ -177,7 +181,7 @@ def main(
 
     # Do nothing if there are no hosts
     if not hosts:
-        print("No hosts provided, exiting.")
+        logger.warning("No hosts provided, exiting.")
         return
 
     # Set up termination handler
@@ -204,7 +208,7 @@ def main(
     # Set up the multiple processes to run
     results_queue = Queue()
     for index, hosts_chunk in enumerate(chunked_hosts):
-        print(f"Starting process {index} with {len(hosts_chunk)} hosts")
+        logger.info(f"Starting process {index} with {len(hosts_chunk)} hosts")
         process = Process(
             target=_pinger,
             args=(
@@ -230,13 +234,13 @@ def main(
 
 if __name__ == "__main__":
     args = _parse_args()
-    print("Configuration:")
-    print(f"\tHTTP Address: {args.http_address}")
-    print(f"\tHTTP Port: {args.http_port}")
-    print(f"\tHosts: {args.hosts}")
-    print(f"\tMax Processes: {args.max_processes}")
-    print(f"\tPoll Interval: {args.poll_interval}")
-    print(f"\tPing Count: {args.ping_count}")
+    logger.debug("Configuration:")
+    logger.debug(f"\tHTTP Address: {args.http_address}")
+    logger.debug(f"\tHTTP Port: {args.http_port}")
+    logger.debug(f"\tHosts: {args.hosts}")
+    logger.debug(f"\tMax Processes: {args.max_processes}")
+    logger.debug(f"\tPoll Interval: {args.poll_interval}")
+    logger.debug(f"\tPing Count: {args.ping_count}")
     main(
         args.http_address,
         args.http_port,
