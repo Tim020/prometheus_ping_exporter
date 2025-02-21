@@ -34,7 +34,7 @@ logging.basicConfig(
     format="%(asctime)s %(name)s %(levelname)-8s %(message)s",
     datefmt="%Y-%m-%dT%H:%M:%S",
 )
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("PingExporter")
 
 
 def terminate_processes(signum, frame, processes: List[Process], run_flag: Event):
@@ -65,7 +65,7 @@ def _pinger(
     run_flag: Event,
     process_num: int,
 ) -> None:
-    internal_logger = logging.getLogger(f"{__name__}.process[{process_num}]")
+    internal_logger = logging.getLogger(f"PingExporter.process.{process_num}")
     internal_logger.info(f"Process {process_num} started with {len(hosts)} hosts.")
     while not run_flag.is_set():
         start_time = time.time()
