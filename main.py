@@ -66,6 +66,7 @@ def _pinger(
     process_num: int,
 ) -> None:
     internal_logger = logging.getLogger(f"{__name__}.process[{process_num}]")
+    internal_logger.info(f"Process {process_num} started with {len(hosts)} hosts.")
     while not run_flag.is_set():
         start_time = time.time()
         for host in hosts:
@@ -86,6 +87,7 @@ def _pinger(
         duration = time.time() - start_time
         results_queue.put(ProcessDuration(process_num, duration))
         next_sleep = poll_interval - duration
+        internal_logger.info(f"Took {duration:2f}s to ping {len(hosts)} hosts.")
         if next_sleep < 0:
             internal_logger.info(
                 "Next sleep is less than 1 second. Consider tuning the poll_interval to a higher value."
@@ -212,6 +214,7 @@ def main(
 
     # Set up the multiple processes to run
     results_queue = Queue()
+    logger.info(f"Starting Ping Exporter with {len(chunked_hosts)} processes and {len(hosts)} hosts")
     for index, hosts_chunk in enumerate(chunked_hosts):
         logger.info(f"Starting process {index} with {len(hosts_chunk)} hosts")
         process = Process(
